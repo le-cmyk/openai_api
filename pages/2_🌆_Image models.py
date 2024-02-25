@@ -1,3 +1,5 @@
+#reguirement : pipreqs --encoding=utf8 --force
+
 import streamlit as st
 from openai import OpenAI
 from PIL import Image

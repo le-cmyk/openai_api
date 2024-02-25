@@ -1,21 +1,33 @@
+# to run the app : streamlit run 1_💬_Chat.py.py
+# to have the correct version  : pipreqs --encoding=utf8 --force
+
 from openai import OpenAI
 import streamlit as st
 
+
 # emojis: https://www.webfx.com/tools/emoji-cheat-sheet/ 
 st.set_page_config(page_title="Chat", page_icon="💬", layout="wide")
+from test_connection import check_credentials
 
 st.title("Chat")
 
 
 if "openai_client" not in st.session_state or st.session_state["openai_client"] is None:
-    password = st.text_input("Enter Password", type="password", autocomplete="on", key="password_token")
 
-    if password in st.secrets["password"]:
-        st.session_state["openai_client"] = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-        st.success('Valid password', icon="✅")
-    else :
-        st.session_state["openai_client"] = None
-        st.error('Not a valid password', icon="🚨")
+    form = st.form("Connection")
+
+    username = form.text_input("Enter Username", type="default", autocomplete="on", key="chat_username_token")
+
+    password = form.text_input("Enter Password", type="password", autocomplete="on", key="chat_password_token")
+
+    if form.form_submit_button ("Connection"):
+
+        if check_credentials(username,password) == True: #password in st.secrets["password"]:
+            st.session_state["openai_client"] = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+            form.success('Valid password', icon="✅")
+        else :
+            st.session_state["openai_client"] = None
+            form.error('Not a valid password', icon="🚨")
 
 
 model_options = {
@@ -80,3 +92,5 @@ if prompt := st.chat_input("Enter the question"):
     else :
         with st.chat_message("assistant"):
             st.write("No client connection")
+
+
