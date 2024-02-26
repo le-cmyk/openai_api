@@ -14,9 +14,9 @@ data = conn.read(worksheet="Example 1",usecols=range(3),  # specify columns whic
         ttl = 20)
 data = data.dropna(how="all")
 
-df_models = conn.read(worksheet="Models",usecols=range(4),  # specify columns which you want to get, comment this out to get all columns
-        ttl = 50)
-df_models = df_models.dropna(how="all")
+st.session_state["df_models"] = conn.read(worksheet="Models", usecols=range(5), ttl = 20)
+
+st.session_state["df_models"] = st.session_state["df_models"].dropna(how="all")
 
 
 def check_credentials(username, password):
@@ -42,21 +42,64 @@ def recuperation_month_usage():
     worksheet_name = token_month_year()
     try :
         
-        df_token_month = conn.read(worksheet=worksheet_name,usecols=range(data['Username'].count()+1), ttl = 40)
+        df_token_month = conn.read(worksheet=worksheet_name,usecols=range(data['Username'].count()+1), ttl = 4)
         
     except WorksheetNotFound:
 
         df_token_month = pd.DataFrame()
 
-        df_token_month["Model_id"] = df_models["Model_id"]
-        n = len(df_models["Model_id"])
+        df_token_month["Model_id"] = st.session_state["df_models"]["Model_id"].tolist() + ["Somme"]
+        n = len(st.session_state["df_models"]["Model_id"])
 
         for user in data['Username'].tolist():
-            df_token_month[user] = [0 for i in range(n)]
+            df_token_month[user] = [(0,0) for i in range(n)] + [0] # + somme of the depense
 
-        st.dataframe(df_token_month)
         df_token_month = conn.create(
             worksheet=worksheet_name,
             data=df_token_month,
         )
-    return df_token_month
+        df_token_month = conn.read(worksheet=worksheet_name,usecols=range(data['Username'].count()+1), ttl = 4)
+
+    return df_token_month , worksheet_name
+
+
+def add_token(username, model, num_token_prompt,num_token_response):
+
+    df_models = st.session_state["df_models"].copy()
+
+    df_models.set_index("Model_id", inplace=True)
+
+    model_id = df_models[df_models["Name"] == model].index[0]
+    
+    df_token_month , worksheet_name = recuperation_month_usage()
+
+    df_token_month.set_index("Model_id", inplace=True)
+    tokens = tuple(map(int, df_token_month.copy().loc[model_id, username].strip("()").split(",")))
+
+    df_token_month.loc[model_id, username] = str((tokens[0] + num_token_prompt ,tokens[1] + num_token_response))
+
+    somme = 0
+    for id_model in df_models.index.tolist() : 
+
+        price = tuple(map(float, df_models.loc[id_model, "Price"].strip("()").split(",")))
+        tokens = tuple(map(int, df_token_month.copy().loc[model_id, username].strip("()").split(",")))
+
+        somme += price[0] /1000 * tokens[0] + price[1] /1000 * tokens[1]
+
+    df_token_month.loc["Somme", username] = somme
+
+    # Calcul du prix mensuel
+    st.session_state["month_price"] = somme
+
+    # Vérification de l'existence de session_price_before
+    if "session_price_before" not in st.session_state:
+        st.session_state["session_price_before"] = somme
+
+    # Calcul du prix de la session actuelle
+    st.session_state["session_price_current"] = somme - st.session_state["session_price_before"]
+
+
+    df_token_month.reset_index(inplace=True)
+
+    conn.update(worksheet=worksheet_name, data=df_token_month)
+
