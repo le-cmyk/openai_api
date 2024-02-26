@@ -14,9 +14,9 @@ data = conn.read(worksheet="Example 1",usecols=range(3),  # specify columns whic
         ttl = 20)
 data = data.dropna(how="all")
 
-st.session_state["df_models"] = conn.read(worksheet="Models", usecols=range(5), ttl = 20)
+df_models = conn.read(worksheet="Models", usecols=range(5), ttl = 20)
 
-st.session_state["df_models"] = st.session_state["df_models"].dropna(how="all")
+df_models = df_models.dropna(how="all")
 
 
 def check_credentials(username, password):
@@ -44,8 +44,8 @@ def recuperation_month_usage():
 
         df_token_month = pd.DataFrame()
 
-        df_token_month["Model_id"] = st.session_state["df_models"]["Model_id"].tolist() + ["Somme"]
-        n = len(st.session_state["df_models"]["Model_id"])
+        df_token_month["Model_id"] = df_models["Model_id"].tolist() + ["Somme"]
+        n = len(df_models["Model_id"])
 
         for user in data['Username'].tolist():
             df_token_month[user] = [(0,0) for i in range(n)] + [0] # + somme of the depense
@@ -60,8 +60,6 @@ def recuperation_month_usage():
 
 
 def add_token(username, model, num_token_prompt,num_token_response):
-
-    df_models = st.session_state["df_models"]
 
     df_models.set_index("Model_id", inplace=True)
 
@@ -94,7 +92,7 @@ def add_token(username, model, num_token_prompt,num_token_response):
     # Calcul du prix de la session actuelle
     st.session_state["session_price_current"] = somme - st.session_state["session_price_before"]
 
-
+    df_models.reset_index(inplace=True)
     df_token_month.reset_index(inplace=True)
 
     conn.update(worksheet=worksheet_name, data=df_token_month)
