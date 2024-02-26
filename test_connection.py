@@ -1,7 +1,7 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import hashlib
-import gspread
+#import gspread
 from gspread.exceptions import WorksheetNotFound
 import datetime
 import pandas as pd
@@ -38,7 +38,7 @@ def recuperation_month_usage():
     worksheet_name = token_month_year()
     try :
         
-        df_token_month = conn.read(worksheet=worksheet_name,usecols=range(data['Username'].count()+1), ttl = 4)
+        df_token_month = conn.read(worksheet=worksheet_name,usecols=range(data['Username'].count()+1), ttl = 0)
         
     except WorksheetNotFound:
 
@@ -54,46 +54,60 @@ def recuperation_month_usage():
             worksheet=worksheet_name,
             data=df_token_month,
         )
-        df_token_month = conn.read(worksheet=worksheet_name,usecols=range(data['Username'].count()+1), ttl = 4)
+        df_token_month = conn.read(worksheet=worksheet_name,usecols=range(data['Username'].count()+1), ttl = 0)
 
     return df_token_month , worksheet_name
 
 
-def add_token(username, model, num_token_prompt,num_token_response):
 
-    df_models.set_index("Model_id", inplace=True)
+def update_token_values(username, model, num_token_prompt, num_token_response):
+    """
+    Updates the token values for a specific user and model.
 
-    model_id = df_models[df_models["Name"] == model].index[0]
-    
+    Parameters:
+    - username: The username of the user.
+    - model: The model name.
+    - num_token_prompt: Number of prompt tokens to add.
+    - num_token_response: Number of response tokens to add.
+    """
     df_token_month , worksheet_name = recuperation_month_usage()
 
+    df_models.set_index("Model_id", inplace=True)
+    model_id = df_models[df_models["Name"] == model].index[0]
+
     df_token_month.set_index("Model_id", inplace=True)
-    tokens = tuple(map(int, df_token_month.copy().loc[model_id, username].strip("()").split(",")))
+    tokens = tuple(map(int, df_token_month.loc[model_id, username].strip("()").split(",")))
 
-    df_token_month.loc[model_id, username] = str((tokens[0] + num_token_prompt ,tokens[1] + num_token_response))
-
-    somme = 0
-    for id_model in df_models.index.tolist() : 
-
-        price = tuple(map(float, df_models.loc[id_model, "Price"].strip("()").split(",")))
-        tokens = tuple(map(int, df_token_month.copy().loc[model_id, username].strip("()").split(",")))
-
-        somme += price[0] /1000 * tokens[0] + price[1] /1000 * tokens[1]
-
-    df_token_month.loc["Somme", username] = somme
-
-    # Calcul du prix mensuel
-    st.session_state["month_price"] = somme
-
-    # Vérification de l'existence de session_price_before
-    if "session_price_before" not in st.session_state:
-        st.session_state["session_price_before"] = somme
-
-    # Calcul du prix de la session actuelle
-    st.session_state["session_price_current"] = somme - st.session_state["session_price_before"]
+    df_token_month.loc[model_id, username] = str((tokens[0] + num_token_prompt, tokens[1] + num_token_response))
 
     df_models.reset_index(inplace=True)
     df_token_month.reset_index(inplace=True)
 
     conn.update(worksheet=worksheet_name, data=df_token_month)
 
+def retrieve_sum_price(username):
+    """
+    Retrieves the sum price for a specific user based on token usage and model prices.
+
+    Parameters:
+    - username: The username of the user.
+
+    Returns:
+    - sum_price: The sum price calculated based on token usage and model prices.
+    """
+
+    df_token_month , _ = recuperation_month_usage()
+
+    df_models.set_index("Model_id", inplace=True)
+    df_token_month.set_index("Model_id", inplace=True)
+
+    sum_price = 0
+    for model_id in df_models.index:
+        price = tuple(map(float, df_models.loc[model_id, "Price"].strip("()").split(",")))
+        tokens = tuple(map(int, df_token_month.loc[model_id, username].strip("()").split(",")))
+        sum_price += price[0] / 1000 * tokens[0] + price[1] / 1000 * tokens[1]
+
+    df_models.reset_index(inplace=True)
+    df_token_month.reset_index(inplace=True)
+
+    return sum_price

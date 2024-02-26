@@ -7,7 +7,7 @@ import tiktoken
 
 # emojis: https://www.webfx.com/tools/emoji-cheat-sheet/ 
 st.set_page_config(page_title="Chat", page_icon="💬", layout="wide")
-from test_connection import check_credentials, add_token
+from test_connection import check_credentials, retrieve_sum_price, update_token_values
 
 st.title("Chat")
 
@@ -26,7 +26,9 @@ if "openai_client" not in st.session_state or st.session_state["openai_client"] 
             st.session_state["openai_client"] = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
             st.session_state["username"] = username
 
-            add_token(st.session_state["username"], "gpt-3.5-turbo-0125", 0,0)
+            st.session_state["session_price_before"] = retrieve_sum_price(username)
+            st.session_state["month_price"] = retrieve_sum_price(username)
+            st.session_state["session_price_current"] = 0
 
             form.success('Valid password', icon="✅")
         else :
@@ -121,18 +123,29 @@ if prompt := st.chat_input("Enter the question"):
         num_token_prompt = num_tokens_from_string(prompt, "cl100k_base")
         num_token_response = num_tokens_from_string(response, "cl100k_base")
 
-        add_token(st.session_state["username"], st.session_state["openai_chat_model"], num_token_prompt,num_token_response)
-        
-
-
-
-        
+        update_token_values(st.session_state["username"], st.session_state["openai_chat_model"], num_token_prompt,num_token_response)
     
     else :
         with st.chat_message("assistant"):
             st.write("No client connection")
 
 
-# Formater et afficher les valeurs dans la barre latérale
-st.sidebar.write("Month price: {:.4%}".format(st.session_state["month_price"]))
-st.sidebar.write("Current session: {:.4f}".format(st.session_state["session_price_current"]))
+
+if st.session_state["openai_client"] is not None:
+
+
+    st.session_state["month_price"] = retrieve_sum_price(st.session_state["username"])
+    st.session_state["session_price_current"] = st.session_state["month_price"] - st.session_state["session_price_before"]
+
+    st.sidebar.metric(
+        label="Spend",
+        value="{:.4} $/month".format(st.session_state["month_price"]),
+        delta="{:.4} $/session".format(st.session_state["session_price_current"]),
+        delta_color="inverse",
+        help="""This metric represents your spending on token consumption. 
+            The 'Spend' value is calculated based on your monthly consumption and is displayed in dollars per month. 
+            The 'Delta' value shows the spending per session, indicating the change in spending compared to the previous session. 
+            The spending data is stored and associated with your username."""
+    )
+    # st.sidebar.write("Month price: {:.4}".format(st.session_state["month_price"]))
+    # st.sidebar.write("Current session: {:.4f}".format(st.session_state["session_price_current"]))
