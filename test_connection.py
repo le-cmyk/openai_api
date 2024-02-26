@@ -27,10 +27,6 @@ def check_credentials(username, password):
     return username in data['Username'].tolist() and encrypt_password(password) == data[data['Username']==username]['Password'].tolist()[0]
 
 
-        
-
-
-
 
 def token_month_year():
     now = datetime.datetime.now()
@@ -65,7 +61,7 @@ def recuperation_month_usage():
 
 def add_token(username, model, num_token_prompt,num_token_response):
 
-    df_models = st.session_state["df_models"].copy()
+    df_models = st.session_state["df_models"]
 
     df_models.set_index("Model_id", inplace=True)
 
