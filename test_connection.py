@@ -10,7 +10,7 @@ import pandas as pd
 #conn.update(worksheet="Example 1", data=data)
 conn = st.connection("gsheets", type=GSheetsConnection)
 data = conn.read(worksheet="Example 1",usecols=range(3),  # specify columns which you want to get, comment this out to get all columns
-        ttl = 20)
+        ttl = 1)
 data = data.dropna(how="all")
 
 df_models = conn.read(worksheet="Models", usecols=range(5), ttl = 20)
@@ -28,6 +28,17 @@ def recuperation_month_usage():
     try :
         
         df_token_month = conn.read(worksheet=worksheet_name,usecols=range(data['Username'].count()+1), ttl = 1)
+
+        if not data['Username'].isin(df_token_month.columns.to_list()).all() :
+
+            missing_username = data[~data['Username'].isin(df_token_month.columns.to_list())]['Username'].to_list()[0]
+            
+            n = len(df_models["Model_id"])
+
+            df_token_month[missing_username] = [(0,0) for i in range(n)] + [0] # + somme of the depense
+
+            conn.update(worksheet=worksheet_name, data=df_token_month)
+
         
     except WorksheetNotFound:
 
@@ -49,6 +60,10 @@ def recuperation_month_usage():
 
 df_token_month , worksheet_name = recuperation_month_usage()
 
+def updating_month_usage_data():
+
+    df_token_month , worksheet_name = recuperation_month_usage()
+
 
 @st.cache_data
 def chat_model_options():
@@ -61,12 +76,35 @@ def chat_model_options():
     return model_options
 
 
-def check_credentials(username, password):
 
-    def encrypt_password(password):
+# region Part connection
+
+def encrypt_password(password):
         return hashlib.sha256(password.encode()).hexdigest()
 
-    return username in data['Username'].tolist() and encrypt_password(password) == data[data['Username']==username]['Password'].tolist()[0]
+def check_credentials(username, password):
+    
+    return ( username in data['Username'].tolist() and 
+            encrypt_password(password) == data[data['Username']==username]['Password'].tolist()[0])
+
+def check_credentials_with_allowed(username, password):
+    
+    return ( username in data['Username'].tolist() and 
+            encrypt_password(password) == data[data['Username']==username]['Password'].tolist()[0] and
+            1 == int(data[data['Username']==username]['Allowed'].tolist()[0]) )
+
+def check_username(username):
+
+    return username in data['Username'].tolist()
+
+def update_user_data(username, password):
+
+    df_new_user = pd.DataFrame({'Username' : username , 'Password' : encrypt_password(password), 'Allowed' : 0})
+    data = pd.concat([data, df_new_user])
+
+    conn.update(worksheet='Example 1', data=data)
+
+#endregion
 
 
 def update_token_values(username, model, num_token_prompt, num_token_response):

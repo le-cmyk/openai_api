@@ -7,44 +7,102 @@ import tiktoken
 
 # emojis: https://www.webfx.com/tools/emoji-cheat-sheet/ 
 st.set_page_config(page_title="Chat", page_icon="💬", layout="wide")
-from test_connection import check_credentials, retrieve_sum_price, update_token_values, chat_model_options, update_df_token_month
+from test_connection import check_credentials_with_allowed, check_credentials, check_username, update_user_data, updating_month_usage_data,retrieve_sum_price, update_token_values, chat_model_options, update_df_token_month
 
 st.title("Chat")
 
+if "New_connection" not in st.session_state :
+    
+    st.session_state["New_connection"] = False
 
 if "openai_client" not in st.session_state or st.session_state["openai_client"] is None:
 
-    form = st.form("Connection")
+    form = st.container(border =True)
 
-    username = form.text_input("Enter Username", type="default", autocomplete="on", key="chat_username_token")
+    if st.session_state["New_connection"] == False :
 
-    password = form.text_input("Enter Password", type="password", autocomplete="on", key="chat_password_token")
+        username = form.text_input("Enter Username", type="default", autocomplete="on", key="chat_username_token")
 
-    if form.form_submit_button ("Connection"):
+        password = form.text_input("Enter Password", type="password", autocomplete="on", key="chat_password_token")
 
-        if check_credentials(username,password) == True: #password in st.secrets["password"]:
-            st.session_state["openai_client"] = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-            st.session_state["username"] = username
+        form_col1, form_col2 = form.columns(2)
 
-            st.session_state["session_price_before"] = retrieve_sum_price(username)
-            st.session_state["month_price"] = retrieve_sum_price(username)
-            st.session_state["session_price_current"] = 0
+        st.session_state["New_connection"] = form_col2.button("Sign Up")
 
-            form.success('Valid password', icon="✅")
+        if form_col1.button("Sign In"):
+            
+            if check_credentials_with_allowed(username,password) == True: #password in st.secrets["password"]:
+                st.session_state["openai_client"] = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+                st.session_state["username"] = username
+
+                st.session_state["session_price_before"] = retrieve_sum_price(username)
+                st.session_state["month_price"] = retrieve_sum_price(username)
+                st.session_state["session_price_current"] = 0
+
+                form.success('Valid password', icon="✅")
+            else :
+                st.session_state["openai_client"] = None
+                st.session_state["username"] = "Guest"
+                st.session_state["session_price_before"] = 0
+                st.session_state["session_price_current"] = 0
+                st.session_state["month_price"] = 0
+                form.error('Not a valid password', icon="🚨")
+        
         else :
             st.session_state["openai_client"] = None
             st.session_state["username"] = "Guest"
             st.session_state["session_price_before"] = 0
             st.session_state["session_price_current"] = 0
             st.session_state["month_price"] = 0
-            form.error('Not a valid password', icon="🚨")
-    
     else :
+
+        new_username = form.text_input("Enter Username", type="default", autocomplete="on", key="chat_username_token")
+
+        new_password = form.text_input("Enter Password", type="password", autocomplete="on", key="confirm_chat_password_token")
+
+        new_password_confirmation = form.text_input("Confirm Password", type="password", autocomplete="on", key="chat_password_token")
+
+        Open_AI_Key = form.text_input("OpenAI key", help = "Your OpenAI key isn't stored and for each connection you will have to put it in")
+
+        form_col1, form_col2 = form.columns(2)
+
+        if form_col1.button("Sign In"):
+
+            if check_username(new_username) is not True and new_password == new_password_confirmation:
+
+                update_user_data(new_username, new_password)
+
+                updating_month_usage_data()
+
+
+                st.session_state["openai_client"] = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+                st.session_state["username"] = new_username
+
+                st.session_state["session_price_before"] = retrieve_sum_price(new_username)
+                st.session_state["month_price"] = retrieve_sum_price(new_username)
+                st.session_state["session_price_current"] = 0
+
+                form.success('Valid password', icon="✅")
+            else :
+                st.session_state["openai_client"] = None
+                st.session_state["username"] = "Guest"
+                st.session_state["session_price_before"] = 0
+                st.session_state["session_price_current"] = 0
+                st.session_state["month_price"] = 0
+                form.error('Not a valid password', icon="🚨")
+        
+        else :
+            st.session_state["openai_client"] = None
+            st.session_state["username"] = "Guest"
+            st.session_state["session_price_before"] = 0
+            st.session_state["session_price_current"] = 0
+            st.session_state["month_price"] = 0
+
+
         st.session_state["openai_client"] = None
-        st.session_state["username"] = "Guest"
-        st.session_state["session_price_before"] = 0
-        st.session_state["session_price_current"] = 0
-        st.session_state["month_price"] = 0
+
+
+
 
 
 
