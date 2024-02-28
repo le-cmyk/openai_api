@@ -1,7 +1,6 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import hashlib
-#import gspread
 from gspread.exceptions import WorksheetNotFound
 import datetime
 import pandas as pd
@@ -18,16 +17,6 @@ df_models = conn.read(worksheet="Models", usecols=range(5), ttl = 20)
 
 df_models = df_models.dropna(how="all")
 
-
-def check_credentials(username, password):
-
-    def encrypt_password(password):
-        return hashlib.sha256(password.encode()).hexdigest()
-
-    return username in data['Username'].tolist() and encrypt_password(password) == data[data['Username']==username]['Password'].tolist()[0]
-
-
-
 def token_month_year():
     now = datetime.datetime.now()
     month_year = now.strftime("Tokens_%B_%Y")
@@ -38,7 +27,7 @@ def recuperation_month_usage():
     worksheet_name = token_month_year()
     try :
         
-        df_token_month = conn.read(worksheet=worksheet_name,usecols=range(data['Username'].count()+1), ttl = 0)
+        df_token_month = conn.read(worksheet=worksheet_name,usecols=range(data['Username'].count()+1), ttl = 1)
         
     except WorksheetNotFound:
 
@@ -54,10 +43,30 @@ def recuperation_month_usage():
             worksheet=worksheet_name,
             data=df_token_month,
         )
-        df_token_month = conn.read(worksheet=worksheet_name,usecols=range(data['Username'].count()+1), ttl = 0)
+        df_token_month = conn.read(worksheet=worksheet_name,usecols=range(data['Username'].count()+1), ttl = 1)
 
     return df_token_month , worksheet_name
 
+df_token_month , worksheet_name = recuperation_month_usage()
+
+
+@st.cache_data
+def chat_model_options():
+    # Filter rows with 'Usage' equal to 'chat'
+    filtered_df = df_models[df_models['Usage'] == 'chat']
+
+    # Create model_options dictionary
+    model_options = dict(zip(filtered_df['Alias'], filtered_df['Name']))
+    
+    return model_options
+
+
+def check_credentials(username, password):
+
+    def encrypt_password(password):
+        return hashlib.sha256(password.encode()).hexdigest()
+
+    return username in data['Username'].tolist() and encrypt_password(password) == data[data['Username']==username]['Password'].tolist()[0]
 
 
 def update_token_values(username, model, num_token_prompt, num_token_response):
@@ -70,7 +79,7 @@ def update_token_values(username, model, num_token_prompt, num_token_response):
     - num_token_prompt: Number of prompt tokens to add.
     - num_token_response: Number of response tokens to add.
     """
-    df_token_month , worksheet_name = recuperation_month_usage()
+    #df_token_month , worksheet_name = recuperation_month_usage()
 
     df_models.set_index("Model_id", inplace=True)
     model_id = df_models[df_models["Name"] == model].index[0]
@@ -83,7 +92,7 @@ def update_token_values(username, model, num_token_prompt, num_token_response):
     df_models.reset_index(inplace=True)
     df_token_month.reset_index(inplace=True)
 
-    conn.update(worksheet=worksheet_name, data=df_token_month)
+    # conn.update(worksheet=worksheet_name, data=df_token_month)
 
 def retrieve_sum_price(username):
     """
@@ -96,9 +105,10 @@ def retrieve_sum_price(username):
     - sum_price: The sum price calculated based on token usage and model prices.
     """
 
-    df_token_month , _ = recuperation_month_usage()
+    # df_token_month , _ = recuperation_month_usage()
 
     df_models.set_index("Model_id", inplace=True)
+
     df_token_month.set_index("Model_id", inplace=True)
 
     sum_price = 0
@@ -107,7 +117,15 @@ def retrieve_sum_price(username):
         tokens = tuple(map(int, df_token_month.loc[model_id, username].strip("()").split(",")))
         sum_price += price[0] / 1000 * tokens[0] + price[1] / 1000 * tokens[1]
 
+    df_token_month.loc["Somme", username] = sum_price
+
     df_models.reset_index(inplace=True)
     df_token_month.reset_index(inplace=True)
 
     return sum_price
+
+
+def update_df_token_month():
+
+
+    conn.update(worksheet=worksheet_name, data=df_token_month)

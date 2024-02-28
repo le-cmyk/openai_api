@@ -7,7 +7,7 @@ import tiktoken
 
 # emojis: https://www.webfx.com/tools/emoji-cheat-sheet/ 
 st.set_page_config(page_title="Chat", page_icon="💬", layout="wide")
-from test_connection import check_credentials, retrieve_sum_price, update_token_values
+from test_connection import check_credentials, retrieve_sum_price, update_token_values, chat_model_options, update_df_token_month
 
 st.title("Chat")
 
@@ -47,18 +47,14 @@ if "openai_client" not in st.session_state or st.session_state["openai_client"] 
         st.session_state["month_price"] = 0
 
 
-model_options = {
-    "gpt-3.5": "gpt-3.5-turbo-0125",
-    "gpt-4": "gpt-4-0125-preview",
-}
 
+# Display choices
 col1,col2,col3 = st.columns([0.2,0.2,0.1])
 
 # Selection of the model
+model_options = chat_model_options()
 model_choice = model_options.get(col1.selectbox("Select an option", model_options.keys(), label_visibility="collapsed"))
 
-if "openai_chat_model" not in st.session_state or model_choice != st.session_state["openai_chat_model"]:
-    st.session_state["openai_chat_model"] = model_choice
 
 # Create a slider to choose a temperature
 def map_temperature(temperature):
@@ -105,7 +101,7 @@ if prompt := st.chat_input("Enter the question"):
 
             
             stream = st.session_state["openai_client"].chat.completions.create(
-                model=st.session_state["openai_chat_model"],
+                model=model_choice,
                 temperature=st.session_state["openai_chat_temperature"],
                 messages=[
                     {"role": m["role"], "content": m["content"]}
@@ -123,7 +119,7 @@ if prompt := st.chat_input("Enter the question"):
         num_token_prompt = num_tokens_from_string(prompt, "cl100k_base")
         num_token_response = num_tokens_from_string(response, "cl100k_base")
 
-        update_token_values(st.session_state["username"], st.session_state["openai_chat_model"], num_token_prompt,num_token_response)
+        update_token_values(st.session_state["username"], model_choice, num_token_prompt,num_token_response)
     
     else :
         with st.chat_message("assistant"):
@@ -132,7 +128,6 @@ if prompt := st.chat_input("Enter the question"):
 
 
 if st.session_state["openai_client"] is not None:
-
 
     st.session_state["month_price"] = retrieve_sum_price(st.session_state["username"])
     st.session_state["session_price_current"] = st.session_state["month_price"] - st.session_state["session_price_before"]
@@ -147,5 +142,7 @@ if st.session_state["openai_client"] is not None:
             The 'Delta' value shows the spending per session, indicating the change in spending compared to the previous session. 
             The spending data is stored and associated with your username."""
     )
-    # st.sidebar.write("Month price: {:.4}".format(st.session_state["month_price"]))
-    # st.sidebar.write("Current session: {:.4f}".format(st.session_state["session_price_current"]))
+
+    update_df_token_month()
+
+
